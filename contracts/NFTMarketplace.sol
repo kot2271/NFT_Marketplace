@@ -54,25 +54,32 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
      * @dev Grant the 'artist' role to a user
      * @param user The address of the user to grant the role to
      */
-    function grantArtistRole(address user) external onlyRole(ADMIN_ROLE) {
+    function grantArtistRole(address user) external {
+        require(
+            hasRole(ADMIN_ROLE, msg.sender),
+            "NFT_Marketplace: must have role ADMIN_ROLE to grant"
+        );
         _grantRole(ARTIST_ROLE, user);
     }
 
     /**
      * @dev Create a new NFT
      */
-    function createItem() external onlyRole(ARTIST_ROLE) {
+    function createItem() external {
+        require(
+            hasRole(ARTIST_ROLE, msg.sender),
+            "NFT_Marketplace: must have role ARTIST_ROLE to mint"
+        );
         _itemIds.increment();
         uint256 tokenId = _itemIds.current();
 
-        // Delegate call to the NFT contract to mint a new token
+        // Call to the NFT contract to mint a new token
         // and store the result in the `mintSuccess` variable
-        (bool mintSuccess, ) = address(nftContract).delegatecall(
+        (bool mintSuccess, ) = address(nftContract).call(
             abi.encodeWithSelector(
-                bytes4(keccak256("mint(address,uint256,string)")),
+                bytes4(keccak256("mint(address,uint256)")),
                 msg.sender,
-                tokenId,
-                getTokenURI(tokenId)
+                tokenId
             )
         );
         require(mintSuccess, "NFT_Marketplace: mint token failed");
@@ -99,9 +106,6 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
             "NFT_Marketplace: Token already listed"
         );
 
-        IERC20 paymentToken = IERC20(_tokenAddress);
-        paymentToken.approve(address(this), _price); // Approve payment token transfer
-
         listings[_tokenId] = Listing({
             tokenId: _tokenId,
             owner: payable(msg.sender),
@@ -123,57 +127,46 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
             listing.owner != address(0),
             "NFT_Marketplace: Token not listed"
         );
-        require(
-            msg.value == listing.price,
-            "NFT_Marketplace: Incorrect payment amount"
-        );
 
-        // Transfer payment token
-        IERC20(listing.paymentToken).transferFrom(
-            msg.sender,
-            listing.owner,
-            listing.price
-        );
+        if (listing.paymentToken == address(0)) {
+            // The payment token is the native token (ETH)
+            require(
+                msg.value >= listing.price,
+                "NFT_Marketplace: Incorrect payment amount"
+            );
+            payable(listing.owner).transfer(msg.value);
+        } else {
+            // The payment token is an ERC20 token
+            require(
+                IERC20(listing.paymentToken).transferFrom(
+                    msg.sender,
+                    listing.owner,
+                    msg.value
+                ),
+                "NFT_Marketplace: Payment token transfer failed"
+            );
+        }
 
         // Transfer NFT
         nftContract.safeTransferFrom(listing.owner, msg.sender, _tokenId);
 
         delete listings[_tokenId];
 
-        emit ItemPurchased(_tokenId, msg.sender, listing.price);
+        emit ItemPurchased(_tokenId, msg.sender, msg.value);
     }
 
     /**
      * @dev Cancel a listing
      * @param _tokenId The ID of the token listing to be cancelled
      */
-    function cancel(uint256 _tokenId) external {
-        Listing memory listing = listings[_tokenId];
-
+    function cancel(uint256 _tokenId) external nonReentrant {
         require(
-            listing.owner == msg.sender,
+            listings[_tokenId].owner == msg.sender,
             "NFT_Marketplace: Only owner can cancel"
         );
 
         delete listings[_tokenId];
 
         emit ListingCancelled(_tokenId);
-    }
-
-    // Utility functions
-
-    /**
-     * @dev Get the token URI of a token
-     * @param _tokenId The ID of the token
-     * @return The token URI
-     */
-    function getTokenURI(
-        uint256 _tokenId
-    ) internal view returns (string memory) {
-        (bool success, bytes memory data) = address(nftContract).staticcall(
-            abi.encodeWithSignature("tokenURI(uint256)", _tokenId)
-        );
-        require(success, "NFT_Marketplace: Unable to fetch token URI");
-        return abi.decode(data, (string));
     }
 }
