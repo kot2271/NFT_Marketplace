@@ -239,11 +239,10 @@ describe("NFTMarketplace", () => {
 
       await erc721Mock.connect(user1).approve(marketplace.address, tokenId);
 
-      await expect(
-        marketplace.connect(user2).buyItem(tokenId, {
-          value: paymentAmount,
-        })
-      ).to.emit(marketplace, "ItemPurchased");
+      await expect(marketplace.connect(user2).buyItem(tokenId)).to.emit(
+        marketplace,
+        "ItemPurchased"
+      );
 
       const newOwner = await erc721Mock.ownerOf(tokenId);
       expect(newOwner).to.equal(user2.address);
@@ -271,14 +270,10 @@ describe("NFTMarketplace", () => {
       ).to.be.revertedWith("NFT_Marketplace: Incorrect payment amount");
     });
 
-    it("should purchase the NFT and transfer ownership for a ERC20 token if the msg.value is greater than price", async () => {
+    it("should purchase the NFT and transfer ownership for a ERC20 token", async () => {
       await marketplace
         .connect(user1)
-        .listItem(
-          tokenId,
-          paymentAmount.sub(ethers.utils.parseEther("3")),
-          erc20Mock.address
-        );
+        .listItem(tokenId, paymentAmount, erc20Mock.address);
 
       await erc20Mock.connect(owner).transfer(user2.address, paymentAmount);
 
@@ -288,11 +283,7 @@ describe("NFTMarketplace", () => {
 
       await erc721Mock.connect(user1).approve(marketplace.address, tokenId);
 
-      await expect(
-        marketplace.connect(user2).buyItem(tokenId, {
-          value: paymentAmount,
-        })
-      )
+      await expect(marketplace.connect(user2).buyItem(tokenId))
         .to.emit(marketplace, "ItemPurchased")
         .withArgs(tokenId, user2.address, paymentAmount);
 

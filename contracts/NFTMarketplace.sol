@@ -23,7 +23,7 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
     // Store token listings
     struct Listing {
         uint256 tokenId;
-        address payable owner;
+        address owner;
         uint256 price;
         address paymentToken;
     }
@@ -108,7 +108,7 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
 
         listings[_tokenId] = Listing({
             tokenId: _tokenId,
-            owner: payable(msg.sender),
+            owner: msg.sender,
             price: _price,
             paymentToken: _tokenAddress
         });
@@ -131,7 +131,7 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
         if (listing.paymentToken == address(0)) {
             // The payment token is the native token (ETH)
             require(
-                msg.value >= listing.price,
+                msg.value == listing.price,
                 "NFT_Marketplace: Incorrect payment amount"
             );
             payable(listing.owner).transfer(msg.value);
@@ -141,7 +141,7 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
                 IERC20(listing.paymentToken).transferFrom(
                     msg.sender,
                     listing.owner,
-                    msg.value
+                    listing.price
                 ),
                 "NFT_Marketplace: Payment token transfer failed"
             );
@@ -152,7 +152,7 @@ contract NFTMarketplace is AccessControl, ReentrancyGuard {
 
         delete listings[_tokenId];
 
-        emit ItemPurchased(_tokenId, msg.sender, msg.value);
+        emit ItemPurchased(_tokenId, msg.sender, listing.price);
     }
 
     /**
