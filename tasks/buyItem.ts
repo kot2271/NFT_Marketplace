@@ -2,7 +2,6 @@ import { task } from "hardhat/config";
 import { HardhatRuntimeEnvironment, TaskArguments } from "hardhat/types";
 import { NFTMarketplace } from "../typechain";
 import { BigNumber } from "ethers";
-import { ethers } from "hardhat";
 
 task("buyItem", "Purchases a listed NFT from the marketplace")
   .addParam("marketplace", "The address of the NFTMarketplace contract")
@@ -20,7 +19,7 @@ task("buyItem", "Purchases a listed NFT from the marketplace")
         )
       );
       const tokenId: BigNumber = taskArgs.tokenId;
-      const paymentAmount: BigNumber = ethers.utils.parseEther(
+      const paymentAmount: BigNumber = hre.ethers.utils.parseEther(
         taskArgs.amount.toString()
       );
 
@@ -32,7 +31,7 @@ task("buyItem", "Purchases a listed NFT from the marketplace")
       const txBuyer = events[0].args["buyer"];
       const txPrice = events[0].args["price"];
 
-      const etherPrice = ethers.utils.formatEther(txPrice);
+      const etherPrice = hre.ethers.utils.formatEther(txPrice);
 
       console.log(`NFT with ID ${txTokenId} purchased successfully`);
       console.log(`Buyer is: ${txBuyer}`);
